@@ -33,13 +33,12 @@ TARGET_FPS = 24
 MAX_OUTPUT_FRAMES = 96
 RENDER_LOCK = threading.Lock()
 
-STYLE_VERSION = "v21"
+STYLE_VERSION = "v22"
 INTER_FONT = Path(os.environ.get("INTER_FONT_PATH", str(BASE_DIR / "Inter.ttf")))
 NUNITO_FONT = Path(os.environ.get("NUNITO_FONT_PATH", str(BASE_DIR / "Nunito.ttf")))
 NUMBER_FONT = Path(os.environ.get("NUMBER_FONT_PATH", str(BASE_DIR / "SFMono-550.ttf")))
 RIBBON_IMAGE = Path(os.environ.get("RIBBON_IMAGE_PATH", str(BASE_DIR / "GiftRibbon-928.png")))
 RIBBON_BASE64 = BASE_DIR / "assets" / "gift-ribbon.png.b64"
-PATTERN_IMAGE = Path(os.environ.get("PATTERN_IMAGE_PATH", str(BASE_DIR / "assets" / "pattern-symbol.png")))
 COMPOSITE_SCALE = 4
 FALLBACK_FONT_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
@@ -182,48 +181,26 @@ def render_component(animation: LottieAnimation, frame_num: int) -> Image.Image:
     return animation.render_pillow_frame(frame_num=frame_num, width=RENDER_SIZE, height=RENDER_SIZE).convert("RGBA")
 
 
-def apply_opacity(image: Image.Image, opacity: float) -> Image.Image:
-    if opacity >= 1.0:
-        return image
-    result = image.copy()
-    result.putalpha(result.getchannel("A").point(lambda value: round(value * opacity)))
-    return result
-
-
-def apply_pattern_edge_fade(image: Image.Image) -> Image.Image:
+def build_pattern_layer(data: dict) -> Image.Image:
+    """Render this gift's own symbol in the approved 17-point layout at 4x."""
     style = TELEGRAM_CARD_STYLE["pattern"]
-    scene_scale = RENDER_SIZE / CARD_SIZE
-    inset = style["edge_fade_inset"] * scene_scale
-    blur = style["edge_fade_blur"] * scene_scale
-    radius = style["edge_fade_core_radius"] * scene_scale
-    mask = Image.new("L", (RENDER_SIZE, RENDER_SIZE), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((inset, inset, RENDER_SIZE - inset - 1, RENDER_SIZE - inset - 1), radius=radius, fill=255)
-    mask = mask.filter(ImageFilter.GaussianBlur(blur))
-    result = image.copy()
-    result.putalpha(ImageChops.multiply(result.getchannel("A"), mask))
-    return result
-
-
-
-def load_pattern_source() -> Image.Image:
-    if not PATTERN_IMAGE.exists():
-        raise FileNotFoundError("Pattern symbol missing: provide PATTERN_IMAGE_PATH or assets/pattern-symbol.png")
-    return Image.open(PATTERN_IMAGE).convert("RGBA")
-
-
-def build_pattern_layer() -> Image.Image:
-    """Build the approved 17-symbol pattern at 4x with vertical-only edge fading."""
-    style = TELEGRAM_CARD_STYLE["pattern"]
+    positions = _asset_positions_from_final(data, style["asset_id"], style["centers"])
+    animation = build_component_animation(
+        data,
+        style["layers"],
+        asset_layer_scale=(style["asset_id"], style["icon_layer_name"], style["icon_scale"]),
+        asset_layer_layout=(style["asset_id"], style["icon_layer_name"], positions),
+    )
     ss = COMPOSITE_SCALE
     size = RENDER_SIZE * ss
-    layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    symbol_size = 112 * (CARD_SIZE / RENDER_SIZE) * (style["icon_scale"] / 1.55)
-    symbol = load_pattern_source().resize((round(symbol_size * ss), round(symbol_size * ss)), Image.Resampling.LANCZOS)
-    symbol = ImageEnhance.Brightness(symbol).enhance(style["brightness"])
-    for x, y in style["centers"]:
-        layer.alpha_composite(symbol, (round((x - symbol_size / 2) * ss), round((y - symbol_size / 2) * ss)))
+    layer = animation.render_pillow_frame(frame_num=0, width=size, height=size).convert("RGBA")
+    layer = ImageEnhance.Brightness(layer).enhance(style["brightness"])
     card_mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(card_mask).rounded_rectangle((CARD_INSET * ss, CARD_INSET * ss, (CARD_INSET + CARD_SIZE) * ss - 1, (CARD_INSET + CARD_SIZE) * ss - 1), radius=CARD_RADIUS * ss, fill=255)
+    ImageDraw.Draw(card_mask).rounded_rectangle(
+        (CARD_INSET * ss, CARD_INSET * ss, (CARD_INSET + CARD_SIZE) * ss - 1, (CARD_INSET + CARD_SIZE) * ss - 1),
+        radius=CARD_RADIUS * ss,
+        fill=255,
+    )
     fade = Image.new("L", (size, size), 0)
     core = (CARD_INSET + style["edge_fade_inset"]) * ss
     ImageDraw.Draw(fade).rectangle((0, core, size - 1, size - core - 1), fill=255)
@@ -231,6 +208,35 @@ def build_pattern_layer() -> Image.Image:
     fade = ImageChops.multiply(fade, card_mask)
     layer.putalpha(ImageChops.multiply(layer.getchannel("A"), fade))
     return layer
+
+
+def build_static_card(background: Image.Image, pattern: Image.Image) -> Image.Image:
+    """Do all expensive 4x background/pattern work once per gift."""
+    ss = COMPOSITE_SCALE
+    size = RENDER_SIZE * ss
+    card = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    card.alpha_composite(
+        background.resize((CARD_SIZE * ss, CARD_SIZE * ss), Image.Resampling.LANCZOS),
+        (CARD_INSET * ss, CARD_INSET * ss),
+    )
+    card.alpha_composite(pattern)
+    card_mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(card_mask).rounded_rectangle(
+        (CARD_INSET * ss, CARD_INSET * ss, (CARD_INSET + CARD_SIZE) * ss - 1, (CARD_INSET + CARD_SIZE) * ss - 1),
+        radius=CARD_RADIUS * ss,
+        fill=255,
+    )
+    card.putalpha(ImageChops.multiply(card.getchannel("A"), card_mask))
+    large = Image.new("RGBA", (size, size), PREVIEW_BLACK)
+    large.alpha_composite(card)
+    return large.resize((RENDER_SIZE, RENDER_SIZE), Image.Resampling.LANCZOS)
+
+
+def build_model_card_mask() -> Image.Image:
+    mask = Image.new("L", (CARD_SIZE, CARD_SIZE), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, CARD_SIZE - 1, CARD_SIZE - 1), radius=CARD_RADIUS, fill=255)
+    return mask
+
 
 def backdrop_color(background: Image.Image) -> tuple[int, int, int, int]:
     rgb = background.convert("RGB")
@@ -331,20 +337,12 @@ def card_canvas(scene: Image.Image) -> Image.Image:
     return canvas
 
 
-def compose_elements(background: Image.Image, pattern: Image.Image, model: Image.Image, number: int, ribbon: Image.Image | None = None, number_layer: Image.Image | None = None) -> tuple[Image.Image, dict[str, Image.Image]]:
-    """Compose the card at 4x and downsample once, matching the approved pre-production path."""
-    ss = COMPOSITE_SCALE
-    size = RENDER_SIZE * ss
-    card = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    card.alpha_composite(background.resize((CARD_SIZE * ss, CARD_SIZE * ss), Image.Resampling.LANCZOS), (CARD_INSET * ss, CARD_INSET * ss))
-    card.alpha_composite(pattern)
-    card.alpha_composite(model.resize((CARD_SIZE * ss, CARD_SIZE * ss), Image.Resampling.LANCZOS), (CARD_INSET * ss, CARD_INSET * ss))
-    card_mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(card_mask).rounded_rectangle((CARD_INSET * ss, CARD_INSET * ss, (CARD_INSET + CARD_SIZE) * ss - 1, (CARD_INSET + CARD_SIZE) * ss - 1), radius=CARD_RADIUS * ss, fill=255)
-    card.putalpha(ImageChops.multiply(card.getchannel("A"), card_mask))
-    large = Image.new("RGBA", (size, size), PREVIEW_BLACK)
-    large.alpha_composite(card)
-    final = large.resize((RENDER_SIZE, RENDER_SIZE), Image.Resampling.LANCZOS)
+def compose_elements(static_card: Image.Image, background: Image.Image, pattern: Image.Image, model: Image.Image, number: int, model_mask: Image.Image, ribbon: Image.Image | None = None, number_layer: Image.Image | None = None) -> tuple[Image.Image, dict[str, Image.Image]]:
+    """Composite only the changing model at 1x; the approved pattern was already downsampled once."""
+    final = static_card.copy()
+    model_card = model.resize((CARD_SIZE, CARD_SIZE), Image.Resampling.LANCZOS)
+    model_card.putalpha(ImageChops.multiply(model_card.getchannel("A"), model_mask))
+    final.alpha_composite(model_card, (CARD_INSET, CARD_INSET))
     ribbon = ribbon or build_ribbon_shape(background)
     number_layer = number_layer or build_number_layer(number)
     final.alpha_composite(ribbon)
@@ -460,7 +458,9 @@ def render_gift(slug: str, number: int) -> dict[str, str | int | None]:
         source_frames = max(1, int(model_animation.lottie_animation_get_totalframe()))
         source_fps = max(1.0, float(model_animation.lottie_animation_get_framerate()))
         background = render_component(background_animation, 0)
-        pattern = build_pattern_layer()
+        pattern = build_pattern_layer(data)
+        static_card = build_static_card(background, pattern)
+        model_mask = build_model_card_mask()
         ribbon = build_ribbon_shape(background)
         number_layer = build_number_layer(number)
         duration_seconds = source_frames / source_fps
@@ -473,9 +473,9 @@ def render_gift(slug: str, number: int) -> dict[str, str | int | None]:
             seconds = index / TARGET_FPS
             source_index = min(source_frames - 1, int(round(seconds * source_fps)))
             model = render_component(model_animation, source_index)
-            final, components = compose_elements(background, pattern, model, number, ribbon=ribbon, number_layer=number_layer)
+            final, components = compose_elements(static_card, background, pattern, model, number, model_mask, ribbon=ribbon, number_layer=number_layer)
             png_path = frame_dir / f"frame-{index:04d}.png"
-            final.convert("RGB").save(png_path, format="PNG", optimize=False)
+            final.convert("RGB").save(png_path, format="PNG", optimize=False, compress_level=1)
             png_paths.append(png_path)
             if index == 0:
                 save_debug_sheet(debug_path, components, final)
