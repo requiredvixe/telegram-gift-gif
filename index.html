@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7f5">
+  <title>Telegram Gift → GIF</title>
+  <style>
+    :root { color-scheme: light dark; --canvas:#f7f7f5; --surface:#fff; --surface-soft:#f0efed; --text:#2c2c2b; --muted:#73716d; --border:#e2e1de; --accent:#2783de; --accent-hover:#176fc3; --accent-soft:#e5f2fc; --danger:#c7473c; --danger-soft:#fce9e7; --shadow:0 1px 2px rgba(0,0,0,.04),0 10px 32px rgba(0,0,0,.06); }
+    *{box-sizing:border-box} html{min-width:320px} body{margin:0;min-height:100vh;background:var(--canvas);color:var(--text);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased} button,input{font:inherit} button,a{-webkit-tap-highlight-color:transparent}
+    .page{width:min(100% - 32px,960px);margin:0 auto;padding:64px 0 40px}.hero{max-width:720px;margin:0 auto 32px;text-align:center}.mark{display:grid;width:64px;height:64px;margin:0 auto 20px;place-items:center;color:var(--accent);background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);border-radius:16px}.mark svg{width:32px;height:32px}.eyebrow{margin:0 0 8px;color:var(--accent);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}h1{margin:0;font-size:clamp(36px,7vw,64px);line-height:1.02;letter-spacing:-.045em}.lead{max-width:620px;margin:18px auto 0;color:var(--muted);font-size:18px}
+    .workspace{overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}.form-area{padding:32px}label{display:block;margin-bottom:10px;font-weight:650}.hint{margin:8px 0 0;color:var(--muted);font-size:14px}input[type=url]{width:100%;min-height:54px;padding:14px 16px;color:var(--text);background:var(--canvas);border:1px solid var(--border);border-radius:10px;outline:none;transition:border-color .16s ease,box-shadow .16s ease}input[type=url]:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.actions{display:flex;align-items:center;gap:16px;margin-top:20px}.primary,.secondary{display:inline-flex;min-height:48px;align-items:center;justify-content:center;gap:8px;padding:0 20px;border-radius:10px;font-weight:700;text-decoration:none;cursor:pointer}.primary{color:#fff;background:var(--accent);border:1px solid var(--accent)}.primary:hover{background:var(--accent-hover)}.primary:disabled{cursor:wait;opacity:.62}.secondary{color:var(--text);background:transparent;border:1px solid var(--border)}.secondary:hover{background:var(--surface-soft)}.privacy{color:var(--muted);font-size:14px}
+    .status,.error{margin:0 32px 32px;padding:14px 16px;border-radius:10px}.status{display:flex;align-items:center;gap:12px;color:var(--accent);background:var(--accent-soft)}.spinner{width:18px;height:18px;flex:0 0 auto;border:2px solid color-mix(in srgb,var(--accent) 25%,transparent);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}.error{color:var(--danger);background:var(--danger-soft)}[hidden]{display:none!important}.result{display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,.9fr);gap:32px;padding:32px;border-top:1px solid var(--border);background:var(--canvas)}.preview{display:grid;min-height:320px;place-items:center;overflow:hidden;background:#171719;border-radius:12px}.preview img{display:block;width:min(100%,420px);height:auto}.result-copy{align-self:center}.result-copy h2{margin:0 0 8px;font-size:30px;line-height:1.15;letter-spacing:-.025em}.result-copy>p{margin:0;color:var(--muted)}.details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:24px 0}.detail{padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}.detail dt{color:var(--muted);font-size:13px}.detail dd{overflow-wrap:anywhere;margin:3px 0 0;font-weight:650}.result-actions{display:flex;flex-wrap:wrap;gap:10px}footer{margin-top:20px;color:var(--muted);text-align:center;font-size:14px}button:focus-visible,a:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:2px}@keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:720px){.page{width:min(100% - 24px,960px);padding-top:36px}.hero{margin-bottom:24px}.form-area,.result{padding:24px}.status,.error{margin:0 24px 24px}.result{grid-template-columns:1fr;gap:24px}.preview{min-height:260px}.actions{align-items:stretch;flex-direction:column}.primary{width:100%}.privacy{text-align:center}}
+    @media(prefers-color-scheme:dark){:root{--canvas:#191919;--surface:#202020;--surface-soft:#30302f;--text:#fff;--muted:rgba(255,255,255,.65);--border:rgba(255,255,255,.18);--accent:#5e9fe8;--accent-hover:#78b0ef;--accent-soft:rgba(94,159,232,.12);--danger:#e97366;--danger-soft:rgba(233,115,102,.12);--shadow:none}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important}.spinner{animation-duration:1.6s}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9h16v11H4zM3 6h18v3H3zM12 6v14M7.5 6c-2.4 0-2.7-3.6-.3-3.6C9.7 2.4 12 6 12 6M16.5 6c2.4 0 2.7-3.6.3-3.6C14.3 2.4 12 6 12 6"/></svg></div>
+      <p class="eyebrow">Публичная ссылка → готовый GIF</p>
+      <h1>Telegram Gift в GIF</h1>
+      <p class="lead">Вставьте ссылку на публичный NFT-подарок. Сервис загрузит оригинальную анимацию, соберёт GIF и покажет результат здесь.</p>
+    </header>
+    <section class="workspace" aria-label="Конвертер Telegram Gift">
+      <form id="giftForm" class="form-area">
+        <label for="giftUrl">Ссылка на подарок</label>
+        <input id="giftUrl" name="url" type="url" required autocomplete="off" spellcheck="false" placeholder="https://t.me/nft/HeroicHelmet-2376">
+        <p class="hint">Подходит публичная ссылка <strong>t.me/nft/…</strong>. Авторизация в Telegram не нужна.</p>
+        <div class="actions"><button id="submitButton" class="primary" type="submit">Собрать GIF <span aria-hidden="true">→</span></button><span class="privacy">Исходник берётся только с Telegram и Fragment</span></div>
+      </form>
+      <div id="status" class="status" role="status" aria-live="polite" hidden><span class="spinner" aria-hidden="true"></span><span id="statusText">Загружаю данные подарка…</span></div>
+      <div id="error" class="error" role="alert" hidden></div>
+      <section id="result" class="result" aria-labelledby="resultTitle" hidden>
+        <div class="preview"><img id="resultImage" alt="Готовая GIF-анимация Telegram Gift"></div>
+        <div class="result-copy">
+          <p class="eyebrow">GIF готов</p><h2 id="resultTitle">Подарок</h2><p id="resultSubtitle">Оригинальная публичная анимация</p>
+          <dl class="details"><div class="detail"><dt>Модель</dt><dd id="modelValue">—</dd></div><div class="detail"><dt>Фон</dt><dd id="backdropValue">—</dd></div><div class="detail"><dt>Символ</dt><dd id="symbolValue">—</dd></div><div class="detail"><dt>Размер</dt><dd id="sizeValue">—</dd></div></dl>
+          <div class="result-actions"><a id="downloadLink" class="primary" download>Скачать GIF</a><a id="sourceLink" class="secondary" target="_blank" rel="noopener noreferrer">Открыть подарок</a></div>
+        </div>
+      </section>
+    </section>
+    <footer>Без Telegram-сессии · Кеш повторных результатов · GIF 420 × 420</footer>
+  </main>
+  <script>
+    const form=document.querySelector('#giftForm'),input=document.querySelector('#giftUrl'),button=document.querySelector('#submitButton'),statusBox=document.querySelector('#status'),statusText=document.querySelector('#statusText'),errorBox=document.querySelector('#error'),result=document.querySelector('#result'),resultImage=document.querySelector('#resultImage');
+    const stages=['Читаю публичные метаданные…','Загружаю оригинальную Lottie-анимацию…','Рендерю кадры…','Собираю палитру GIF…'];let stageTimer;
+    function setBusy(v){button.disabled=v;input.disabled=v;statusBox.hidden=!v;if(!v)clearInterval(stageTimer)}
+    function valueOrDash(v){return v&&String(v).trim()?v:'—'}
+    form.addEventListener('submit',async event=>{event.preventDefault();errorBox.hidden=true;result.hidden=true;setBusy(true);let stage=0;statusText.textContent=stages[stage];stageTimer=setInterval(()=>{stage=Math.min(stage+1,stages.length-1);statusText.textContent=stages[stage]},1800);const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),120000);try{const response=await fetch('/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:input.value.trim()}),signal:controller.signal});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.detail||'Не удалось собрать GIF');const imageUrl=payload.gif_url+'?v='+Date.now();resultImage.src=imageUrl;resultImage.alt=`GIF-анимация ${payload.title} #${payload.number}`;document.querySelector('#resultTitle').textContent=payload.title;document.querySelector('#resultSubtitle').textContent=`Подарок #${payload.number}`;document.querySelector('#modelValue').textContent=valueOrDash(payload.model);document.querySelector('#backdropValue').textContent=valueOrDash(payload.backdrop);document.querySelector('#symbolValue').textContent=valueOrDash(payload.symbol);document.querySelector('#sizeValue').textContent=`${payload.size_kb} КБ`;const download=document.querySelector('#downloadLink');download.href=payload.download_url;download.setAttribute('download',`${payload.title}-${payload.number}.gif`);document.querySelector('#sourceLink').href=payload.source_url;result.hidden=false;result.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'})}catch(error){errorBox.textContent=error.name==='AbortError'?'Рендер занял слишком много времени. Попробуйте ещё раз.':error.message;errorBox.hidden=false}finally{clearTimeout(timeout);setBusy(false)}});
+  </script>
+</body>
+</html>
