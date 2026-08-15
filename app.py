@@ -7,6 +7,7 @@ import os
 import html
 import json
 import re
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -18,7 +19,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageFilter, ImageEnhance
 from rlottie_python import LottieAnimation
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -32,12 +33,13 @@ TARGET_FPS = 24
 MAX_OUTPUT_FRAMES = 96
 RENDER_LOCK = threading.Lock()
 
-STYLE_VERSION = "v14"
+STYLE_VERSION = "v21"
 INTER_FONT = Path(os.environ.get("INTER_FONT_PATH", str(BASE_DIR / "Inter.ttf")))
 NUNITO_FONT = Path(os.environ.get("NUNITO_FONT_PATH", str(BASE_DIR / "Nunito.ttf")))
 NUMBER_FONT = Path(os.environ.get("NUMBER_FONT_PATH", str(BASE_DIR / "SFMono-550.ttf")))
 RIBBON_IMAGE = Path(os.environ.get("RIBBON_IMAGE_PATH", str(BASE_DIR / "GiftRibbon-928.png")))
 RIBBON_BASE64 = BASE_DIR / "assets" / "gift-ribbon.png.b64"
+PATTERN_IMAGE = Path(os.environ.get("PATTERN_IMAGE_PATH", str(BASE_DIR / "assets" / "pattern-symbol.png")))
 COMPOSITE_SCALE = 4
 FALLBACK_FONT_CANDIDATES = (
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
@@ -64,10 +66,10 @@ TELEGRAM_CARD_STYLE = {
             (85.0, 472.5), (216.25, 472.5), (347.5, 472.5),
             (104.0, 29.6), (216.4, 201.1),
         ),
-        "opacity": 1.0,
+        "brightness": 0.50,
         "edge_fade_inset": 50.0,
         "edge_fade_blur": 28.0,
-        "edge_fade_core_radius": 16.0,
+        "edge_fade_axes": "vertical",
     },
     "ribbon": {
         "source_size": 58.0,
@@ -202,6 +204,34 @@ def apply_pattern_edge_fade(image: Image.Image) -> Image.Image:
     return result
 
 
+
+def load_pattern_source() -> Image.Image:
+    if not PATTERN_IMAGE.exists():
+        raise FileNotFoundError("Pattern symbol missing: provide PATTERN_IMAGE_PATH or assets/pattern-symbol.png")
+    return Image.open(PATTERN_IMAGE).convert("RGBA")
+
+
+def build_pattern_layer() -> Image.Image:
+    """Build the approved 17-symbol pattern at 4x with vertical-only edge fading."""
+    style = TELEGRAM_CARD_STYLE["pattern"]
+    ss = COMPOSITE_SCALE
+    size = RENDER_SIZE * ss
+    layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    symbol_size = 112 * (CARD_SIZE / RENDER_SIZE) * (style["icon_scale"] / 1.55)
+    symbol = load_pattern_source().resize((round(symbol_size * ss), round(symbol_size * ss)), Image.Resampling.LANCZOS)
+    symbol = ImageEnhance.Brightness(symbol).enhance(style["brightness"])
+    for x, y in style["centers"]:
+        layer.alpha_composite(symbol, (round((x - symbol_size / 2) * ss), round((y - symbol_size / 2) * ss)))
+    card_mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(card_mask).rounded_rectangle((CARD_INSET * ss, CARD_INSET * ss, (CARD_INSET + CARD_SIZE) * ss - 1, (CARD_INSET + CARD_SIZE) * ss - 1), radius=CARD_RADIUS * ss, fill=255)
+    fade = Image.new("L", (size, size), 0)
+    core = (CARD_INSET + style["edge_fade_inset"]) * ss
+    ImageDraw.Draw(fade).rectangle((0, core, size - 1, size - core - 1), fill=255)
+    fade = fade.filter(ImageFilter.GaussianBlur(style["edge_fade_blur"] * ss))
+    fade = ImageChops.multiply(fade, card_mask)
+    layer.putalpha(ImageChops.multiply(layer.getchannel("A"), fade))
+    return layer
+
 def backdrop_color(background: Image.Image) -> tuple[int, int, int, int]:
     rgb = background.convert("RGB")
     width, height = rgb.size
@@ -302,16 +332,25 @@ def card_canvas(scene: Image.Image) -> Image.Image:
 
 
 def compose_elements(background: Image.Image, pattern: Image.Image, model: Image.Image, number: int, ribbon: Image.Image | None = None, number_layer: Image.Image | None = None) -> tuple[Image.Image, dict[str, Image.Image]]:
-    scene = Image.new("RGBA", (RENDER_SIZE, RENDER_SIZE), (0, 0, 0, 0))
-    scene.alpha_composite(background)
-    scene.alpha_composite(pattern)
-    scene.alpha_composite(model)
+    """Compose the card at 4x and downsample once, matching the approved pre-production path."""
+    ss = COMPOSITE_SCALE
+    size = RENDER_SIZE * ss
+    card = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    card.alpha_composite(background.resize((CARD_SIZE * ss, CARD_SIZE * ss), Image.Resampling.LANCZOS), (CARD_INSET * ss, CARD_INSET * ss))
+    card.alpha_composite(pattern)
+    card.alpha_composite(model.resize((CARD_SIZE * ss, CARD_SIZE * ss), Image.Resampling.LANCZOS), (CARD_INSET * ss, CARD_INSET * ss))
+    card_mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(card_mask).rounded_rectangle((CARD_INSET * ss, CARD_INSET * ss, (CARD_INSET + CARD_SIZE) * ss - 1, (CARD_INSET + CARD_SIZE) * ss - 1), radius=CARD_RADIUS * ss, fill=255)
+    card.putalpha(ImageChops.multiply(card.getchannel("A"), card_mask))
+    large = Image.new("RGBA", (size, size), PREVIEW_BLACK)
+    large.alpha_composite(card)
+    final = large.resize((RENDER_SIZE, RENDER_SIZE), Image.Resampling.LANCZOS)
     ribbon = ribbon or build_ribbon_shape(background)
     number_layer = number_layer or build_number_layer(number)
-    final = card_canvas(scene)
     final.alpha_composite(ribbon)
     final.alpha_composite(number_layer)
-    return final, {"background": background, "pattern": pattern, "model": model, "ribbon": ribbon, "number": number_layer, "scene": scene}
+    pattern_preview = pattern.resize((RENDER_SIZE, RENDER_SIZE), Image.Resampling.LANCZOS)
+    return final, {"background": background, "pattern": pattern_preview, "model": model, "ribbon": ribbon, "number": number_layer, "scene": final}
 
 
 def save_debug_sheet(path: Path, components: dict[str, Image.Image], final: Image.Image) -> None:
@@ -416,35 +455,49 @@ def render_gift(slug: str, number: int) -> dict[str, str | int | None]:
         if not data.get("layers") or not data.get("w") or not data.get("h"):
             raise ValueError("Для этой ссылки не найдена корректная анимация")
         background_animation = build_component_animation(data, TELEGRAM_CARD_STYLE["background"]["layers"])
-        pattern_style = TELEGRAM_CARD_STYLE["pattern"]
-        pattern_positions = _asset_positions_from_final(data, pattern_style["asset_id"], pattern_style["centers"])
-        pattern_animation = build_component_animation(data, pattern_style["layers"], asset_layer_scale=(pattern_style["asset_id"], pattern_style["icon_layer_name"], pattern_style["icon_scale"]), asset_layer_layout=(pattern_style["asset_id"], pattern_style["icon_layer_name"], pattern_positions))
         model_style = TELEGRAM_CARD_STYLE["model"]
         model_animation = build_component_animation(data, model_style["layers"], root_scales={"Gift": model_style["root_scale"]})
         source_frames = max(1, int(model_animation.lottie_animation_get_totalframe()))
         source_fps = max(1.0, float(model_animation.lottie_animation_get_framerate()))
         background = render_component(background_animation, 0)
-        pattern = apply_pattern_edge_fade(apply_opacity(render_component(pattern_animation, 0), pattern_style["opacity"]))
+        pattern = build_pattern_layer()
         ribbon = build_ribbon_shape(background)
         number_layer = build_number_layer(number)
         duration_seconds = source_frames / source_fps
         output_count = max(1, min(MAX_OUTPUT_FRAMES, int(round(duration_seconds * TARGET_FPS))))
-        frames: list[Image.Image] = []
+        frame_dir = OUTPUT_DIR / f".{safe_stem}-{STYLE_VERSION}-png-frames"
+        shutil.rmtree(frame_dir, ignore_errors=True)
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        png_paths: list[Path] = []
         for index in range(output_count):
             seconds = index / TARGET_FPS
             source_index = min(source_frames - 1, int(round(seconds * source_fps)))
             model = render_component(model_animation, source_index)
             final, components = compose_elements(background, pattern, model, number, ribbon=ribbon, number_layer=number_layer)
-            frames.append(final)
+            png_path = frame_dir / f"frame-{index:04d}.png"
+            final.convert("RGB").save(png_path, format="PNG", optimize=False)
+            png_paths.append(png_path)
             if index == 0:
                 save_debug_sheet(debug_path, components, final)
-        rgb_frames = [frame.convert("RGB") for frame in frames]
-        palette = rgb_frames[len(rgb_frames) // 2].quantize(colors=256, method=Image.Quantize.MEDIANCUT)
-        quantized = [frame.quantize(palette=palette, dither=Image.Dither.NONE) for frame in rgb_frames]
+        rgb_frames: list[Image.Image] = []
+        for png_path in png_paths:
+            with Image.open(png_path) as png_frame:
+                if png_frame.mode != "RGB":
+                    raise RuntimeError(f"PNG frame is not opaque RGB: {png_path.name}")
+                rgb_frames.append(png_frame.copy())
+        sample_size = 105
+        columns = 9
+        rows = (len(rgb_frames) + columns - 1) // columns
+        palette_source = Image.new("RGB", (columns * sample_size, rows * sample_size))
+        for index, frame in enumerate(rgb_frames):
+            palette_source.paste(frame.resize((sample_size, sample_size), Image.Resampling.LANCZOS), ((index % columns) * sample_size, (index // columns) * sample_size))
+        palette = palette_source.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
+        quantized = [frame.quantize(palette=palette, dither=Image.Dither.FLOYDSTEINBERG) for frame in rgb_frames]
         delay_ms = max(20, round((1000 / TARGET_FPS) / 10) * 10)
         temp_path = gif_path.with_suffix(".tmp.gif")
         quantized[0].save(temp_path, save_all=True, append_images=quantized[1:], duration=delay_ms, loop=0, optimize=True, disposal=2)
         temp_path.replace(gif_path)
+        (frame_dir / "manifest.json").write_text(json.dumps({"version": STYLE_VERSION, "format": "RGB PNG", "size": [RENDER_SIZE, RENDER_SIZE], "frame_count": len(png_paths), "fps": TARGET_FPS, "files": [path.name for path in png_paths]}, ensure_ascii=False, indent=2), encoding="utf-8")
         result = {**metadata, "gif_url": "/output/" + gif_path.name, "download_url": "/output/" + gif_path.name, "size_kb": round(gif_path.stat().st_size / 1024), "frame_count": output_count, "layout_version": STYLE_VERSION}
         temp_meta = meta_path.with_suffix(".tmp.json")
         temp_meta.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")

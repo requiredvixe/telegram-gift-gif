@@ -8,9 +8,9 @@ A web renderer for Telegram collectible gifts. Paste a public `t.me/nft/...` URL
 
 - Reads Telegram's public collectible metadata and Lottie animation.
 - Renders backdrop, gift model, and the gift-specific pattern separately.
-- Uses the calibrated 17-point pattern layout with edge fading.
+- Uses the calibrated 17-point pattern layout with darker symbols and vertical-only edge fading.
 - Adds a sharp ribbon, rounded envelope, and geometry-linked collectible number.
-- Exports a looping GIF plus metadata and a debug sheet.
+- Pre-renders opaque RGB PNG frames, then assembles a looping GIF with a shared animation palette; also exports metadata and a debug sheet.
 
 ## Run with Docker
 
