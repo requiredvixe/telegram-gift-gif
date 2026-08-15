@@ -1,0 +1,12 @@
+services:
+  gift-gif:
+    build: .
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - NUMBER_FONT_PATH=${NUMBER_FONT_PATH:-}
+    volumes:
+      - ./output:/app/output
+      # Optional licensed SF Mono mount:
+      # - /absolute/path/to/SFMono-550.ttf:/app/SFMono-550.ttf:ro
